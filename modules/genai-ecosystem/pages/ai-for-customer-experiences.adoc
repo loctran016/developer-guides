@@ -7,9 +7,7 @@ include::_graphacademy_llm.adoc[]
 :neo4j-versions: 5.x
 :page-pagination:
 :page-product: graphrag-customer-experience
-//:imagesdir: https://dev.assets.neo4j.com/wp-content/uploads/2024/
 
-//image::https://dist.neo4j.com/wp-content/uploads/20240618104511/build-kg-genai-e1718732751482.png[width=800, align=center,link="https://llm-graph-builder.neo4jlabs.com/",window="_blank"]
 
 Use Graph-powered RAG (GraphRAG) to improve customer experiences throughout multiple touch-points in their journey:
 

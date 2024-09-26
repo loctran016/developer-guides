@@ -1,9 +1,9 @@
 ** xref:index.adoc[GenAI Ecosystem]
 *** Example Projects
 **** xref:llm-graph-builder.adoc[LLM Graph Builder]
-**** xref:ai-for-customer-experiences.adoc[GraphRAG for Customer Experience]
 ***** xref:llm-graph-builder-features.adoc[Features]
 ***** xref:llm-graph-builder-deployment.adoc[Deployment]
+**** xref:ai-for-customer-experiences.adoc[GraphRAG for Customer Experience]
 **** xref:rag-demo.adoc[GraphRAG Demo]
 **** xref:neoconverse.adoc[NeoConverse]
 **** xref:genai-stack.adoc[GenAI Stack]

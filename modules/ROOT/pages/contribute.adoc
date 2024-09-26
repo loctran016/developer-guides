@@ -2,6 +2,7 @@
 :author: Neo4j
 :category: development
 :tags: community, contributions, share
+:page-layout: center-align
 
 [#neo4j-contribute]
 Looking for a place to contribute to the Neo4j ecosystem?
@@ -69,7 +70,7 @@ Giving an indication that you understand the value of that is the least you can 
 No matter where you live in the world, there are plenty of ways to share your love of graphs
 and help others understand the importance of relationships.
 
-With thousands of technology and business *conferences* occuring every year around the world, 
+With thousands of technology and business *conferences* occuring every year around the world,
 you can present to your peers and become a recognized expert in your field.  Neo4j, via the
 link:/speaker-program/[*Neo4j Speaker Program*], can also help and reimburse
 travel expenses for community members speaking at many of the top conferences.
@@ -77,7 +78,7 @@ travel expenses for community members speaking at many of the top conferences.
 There are also hundreds of face-to-face https://www.meetup.com/topics/neo4j/[*Neo4j meetup groups*] in communities
 around the world.  Many of these meetup groups regularly look for speakers to share their stories.
 
-The https://www.meetup.com/Neo4j-Online-Meetup/[*Neo4j Online Meetup*] is a way for you to meet the global community online and share your story. 
+The https://www.meetup.com/Neo4j-Online-Meetup/[*Neo4j Online Meetup*] is a way for you to meet the global community online and share your story.
 
 We select talks for the Online Meetup and stories for our link:/tag/twin4j/[*Developer Newsletter*] from https://community.neo4j.com/[*Neo4j Community Forum*]. To submit your story, post it in the `Projects & Collaboration` (if including a link to github or website) or `Community Content & Blogs` (if linking to a blog post,
 slideshow, video, or article) categories.

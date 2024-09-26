@@ -64,9 +64,9 @@ The dev script will also listen for changes and automatically rebuild the files 
 You'll still need to refresh the page to view the changes.
 
 
-// == Publishing
+== Publishing
 
-// Merging changes into the `publish` branch of this repo will trigger a rebuild of the HTML and CSS files in the link:https://github.com/neo4j-documentation/docs-refresh[Docs Refresh^] repo using a link:.github/[Github Action].
+Merging changes into the `publish` branch of this repo will trigger a rebuild of the HTML and CSS files in the link:https://github.com/neo4j-documentation/docs-refresh[Docs Refresh^] repo using a link:.github/[Github Action].
 
 // [source,sh]
 // ----
@@ -84,6 +84,3 @@ You'll still need to refresh the page to view the changes.
 // # Push the HEAD of the branch to the publish branch
 // git push origin HEAD:publish
 // ----
-
-
-

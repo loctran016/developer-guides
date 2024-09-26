@@ -8,8 +8,8 @@
     "start": "npm run build && npm run serve & npm run watch",
     "serve": "node server.js",
     "watch": "nodemon -e adoc --exec \"npm run build\"",
-    "build": "antora --stacktrace preview.yml",
-    "lint": "node scripts/lint-links.js",
+    "build": "antora --stacktrace --fetch preview.yml",
+    "lint": "link-checker build/site --static /static/assets=build/site/_ --skip-file ./ignore-links.txt",
     "publish": "git push origin HEAD:publish",
     "downloadNotebooks": "node scripts/download-lp-notebooks.js"
   },
@@ -29,7 +29,8 @@
     "@antora/site-generator-default": "^2.3.3",
     "@neo4j-documentation/macros": "^1.0.0",
     "@neo4j-documentation/remote-include": "^1.0.0",
-    "express": "^4.17.1",
+    "antora": "^3.1.9",
+    "express": "^4.17.3",
     "npm-watch": "^0.6.0"
   },
   "watch": {
@@ -41,7 +42,7 @@
     }
   },
   "devDependencies": {
-    "cheerio": "^1.0.0-rc.3",
-    "hyperlink": "^4.6.0"
+    "@neo4j-documentation/link-checker": "github:Mogztter/link-checker#v0.1.0",
+    "cheerio": "^1.0.0-rc.3"
   }
 }

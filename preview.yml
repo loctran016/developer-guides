@@ -1,20 +1,20 @@
 site:
   title: Neo4j Developer Portal
   url: /developer
-  start_page: developer:ROOT:index.adoc
+  start_page: developer:genai-ecosystem:index.adoc
 
 content:
   sources:
   - url: ./
     branches: HEAD
+    edit_url: ~
     exclude:
     - '!**/_includes/*'
     - '!**/readme.adoc'
     - '!**/README.adoc'
 ui:
   bundle:
-    url: https://s3-eu-west-1.amazonaws.com/static-content.neo4j.com/build/ui-bundle-latest.zip
-    snapshot: true
+    url: https://d12wh7zj8x3amw.cloudfront.net/build/ui-bundle.zip
 
 urls:
   html_extension_style: indexify

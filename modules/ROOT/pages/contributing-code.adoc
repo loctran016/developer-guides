@@ -2,6 +2,7 @@
 :author: Neo4j
 :category: development
 :tags: community, contributions, code
+:page-layout: center-align
 
 [#code-contrib]
 == Intro

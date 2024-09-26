@@ -1,0 +1,476 @@
+= AI For Customer Experiences: A Retail Example
+include::_graphacademy_llm.adoc[]
+:slug: graphrag-customer-experience
+:author: Zach Blumenfeld
+:category: genai-tutorials
+:tags:
+:neo4j-versions: 5.x
+:page-pagination:
+:page-product: graphrag-customer-experience
+
+
+Use Graph-powered RAG (GraphRAG) to improve customer experiences throughout multiple touch-points in their journey:
+
+* *Discovery:* Generate personalized marketing and email content
+* *Search:* Offer tailored results based on semantic similarity
+* *Recommendations:* Provide targeted product suggestions
+* *Support:* Deliver compliant AI scripts for customer assistance
+
+This short guide walks through setting up a full-stack GraphRAG application demonstrating all the above using Neo4j, LangChain (with LangServe), and OpenAI. The app focuses on a retail example using the https://github.com/neo4j-product-examples/graphrag-customer-experience#:~:text=H%26M%20Personalized%20Fashion%20Recommendations%20Dataset[H&M Personalized Fashion Recommendations Dataset^], a sample of real customer purchase data that includes rich information around products including names, types, descriptions, department sections, etc. All code can be found in the https://github.com/neo4j-product-examples/graphrag-customer-experience[GitHub repository^].
+
+image::ai-cust-exp-architecture.png[align=center]
+
+== Running The App
+
+=== Prerequisites
+
+1. https://docs.docker.com/engine/install/[Docker^]
+2. https://platform.openai.com/docs/quickstart/account-setup[OpenAI API Key^]
+
+=== Setup
+Clone the repository
+[source, bash]
+----
+git clone https://github.com/neo4j-product-examples/graphrag-customer-experience.git
+----
+
+create a `.env` file with the below. Fill in your OpenAI key. You can use our pre-loaded demo database to start, just copy the Neo4j uri, password, username, and database credentials below.
+Alternatively, the https://github.com/neo4j-product-examples/graphrag-customer-experience[GitHub repository^] has directions for creating your own database from source data if you are interested.
+
+[source, bash]
+----
+#Neo4j Database
+NEO4J_URI=neo4j+s://b5d4f951.databases.neo4j.io
+NEO4J_USERNAME=retail
+NEO4J_PASSWORD=pleaseletmein
+NEO4J_DATABASE=neo4j
+
+#OpenAI
+OPENAI_API_KEY=sk-...
+
+#Other
+# Used by UI to navigate between pages. Only change when hosting remotely
+ADVERTISED_ADDRESS="http://localhost"
+----
+
+=== Run
+To start the app, run the following command:
+[source, bash]
+----
+docker-compose up
+----
+
+To start and rebuild, after changing env variables or code, run
+
+[source, bash]
+----
+docker-compose up --build
+----
+
+To stop the app, run
+
+[source, bash]
+----
+docker-compose down
+----
+
+Open `http://localhost:8501` in your browser to interact with the app.
+
+== How Each Page Works
+
+To understand how each page works it helps to first under the graph data models used.  For Discovery, Search, and Recommendation pages we use the below model which contains customer purchase transactions as well as text embeddings on products to support vector search.
+
+image::ai-cust-exp-product-data-model.png[width=600, align=center]
+
+For the Support page, the data model resembles the below, where <Entity> and <RELATES_TO> cover various entities extracted from support documentation.
+
+image::ai-cust-exp-support-data-model.png[width=600, align=center]
+
+Directions & details for data loading can be found https://github.com/neo4j-product-examples/graphrag-customer-experience?tab=readme-ov-file#populating-databases[here^]. It requires a combination of structured data loading, embedding, and named entity recognition (NER).
+
+
+=== Search Page
+Once you understand how the Search page works, it will be easier to understand the Discovery & Recommendation pages.
+The Search page uses a LangChain retriever to first perform vector search on product nodes.  It will then perform re-ranking and filtering based on a graph traversal to personalize the response.  Below is a diagram of the flow.
+
+image::ai-cust-exp-app-search-flow.png[align=center]
+
+The graph traversal improves results by using shared purchase patterns to incorporate customer preferences. The logic is similar to that of collaborative filtering.  Essentially, it examines which customers have purchased similar products to the current user, then looks at other products heavily purchased by that group and cross-references against the vector search candidates.
+
+This methodology is particularly useful in instances where vector search produces many, overly broad, results. For example, consider a customer search prompt for "denim jeans", if we use vector search alone, we will get back many results with cosine similarity scores upward of 90%. Below is an example using LangChain to pull back 100 results.
+
++*In[1]:*+
+[source, python]
+----
+from langchain.vectorstores.neo4j_vector import Neo4jVector
+from langchain_openai import OpenAIEmbeddings
+import pandas as pd
+
+search_prompt = 'denim jeans'
+
+embedding_model = OpenAIEmbeddings()
+
+# define retriever
+vector_only_search = Neo4jVector.from_existing_index(
+   embedding=embedding_model,
+   url=NEO4J_URI,
+   username=NEO4J_USERNAME,
+   password=NEO4J_PASSWORD,
+   index_name='product_text_embeddings',
+   retrieval_query="""
+   WITH node AS product, score
+   RETURN product.productCode AS productCode,
+       product.text AS text, score,
+       {score:score, productCode: product.productCode} AS metadata
+       ORDER BY score DESC
+       """)
+
+# similarity search
+res = vector_only_search.similarity_search(search_prompt, k=100)
+
+# visualize as a dataframe
+vector_only_df = pd.DataFrame([{'productCode': d.metadata['productCode'],
+                               'document': d.page_content,
+                               'score': d.metadata['score']} for d in res])
+vector_only_df
+----
++*Out[1]:*+
+
+[cols=",,,",options="header",]
+|===
+| |productCode |document |score
+|0 |252298 |##Product\nName: Didi denim\nType: Trousers\nGroup: Garment
+Lower body\nGarment Type: Dresses La... |0.938463
+
+|1 |598423 |##Product\nName: Night Denim\nType: Trousers\nGroup: Garment
+Lower body\nGarment Type: Dresses L... |0.936840
+
+|2 |727804 |##Product\nName: Didi HW Skinny denim\nType:
+Trousers\nGroup: Garment Lower body\nGarment Type: ... |0.934703
+
+|... |... |... |...
+
+|97 |663133 |##Product\nName: RELAXED SKINNY\nType: Trousers\nGroup:
+Garment Lower body\nGarment Type: Trouse... |0.922477
+
+|98 |820827 |##Product\nName: Jade HW Skinny Button dnm\nType:
+Trousers\nGroup: Garment Lower body\nGarment T... |0.922452
+
+|99 |309864 |##Product\nName: Skinny Cheapo 89\nType: Trousers\nGroup:
+Garment Lower body\nGarment Type: Trou... |0.922402
+|===
+
+100 rows × 3 columns
+
+
+However, if we incorporate a graph pattern to help filter results based on shared purchase histories, as shown in the code below, we can get highly differentiated scores which are based on the count of purchases among customers with similar purchase patterns.
+
++*In[2]:*+
+[source, python]
+----
+# define retriever
+kg_search = Neo4jVector.from_existing_index(
+   embedding=embedding_model,
+   url=NEO4J_URI,
+   username=NEO4J_USERNAME,
+   password=NEO4J_PASSWORD,
+   index_name='product_text_embeddings',
+   retrieval_query="""
+   WITH node AS product, score AS vectorScore
+
+   OPTIONAL MATCH(product)<-[:VARIANT_OF]-(:Article)<-[:PURCHASED]-(:Customer)
+   -[:PURCHASED]->(a:Article)<-[:PURCHASED]-(:Customer {customerId: $customerId})
+
+   WITH count(a) AS graphScore,
+       product.text AS text,
+       vectorScore,
+       product.productCode AS productCode
+   RETURN text,
+       (1+graphScore)*vectorScore AS score,
+       {productCode: productCode,
+           graphScore:graphScore,
+           vectorScore:vectorScore} AS metadata
+   ORDER BY graphScore DESC, vectorScore DESC LIMIT 15
+   """)
+
+
+# similarity search (with personalized graph pattern)
+CUSTOMER_ID = "daae10780ecd14990ea190a1e9917da33fe96cd8cfa5e80b67b4600171aa77e0"
+kg_res = kg_search.similarity_search(search_prompt,
+                                    k=100,
+                                    params={'customerId': CUSTOMER_ID})
+
+# visualize as a dataframe
+vector_kg_df = pd.DataFrame([{'productCode': d.metadata['productCode'],
+              'document': d.page_content,
+              'vectorScore': d.metadata['vectorScore'],
+              'graphScore': d.metadata['graphScore']} for d in kg_res])
+vector_kg_df
+----
+
+
++*Out[2]:*+
+[cols=",,,,",options="header",]
+|===
+| |productCode |document |vectorScore |graphScore
+|0 |670698 |##Product\nName: Rachel HW Denim TRS\nType: Trousers\nGroup:
+Garment Lower body\nGarment Type: T... |0.922642 |22
+
+|1 |706016 |##Product\nName: Jade HW Skinny Denim TRS\nType:
+Trousers\nGroup: Garment Lower body\nGarment Ty... |0.926760 |11
+
+|2 |777038 |##Product\nName: Bono NW slim denim\nType: Trousers\nGroup:
+Garment Lower body\nGarment Type: Tr... |0.926300 |8
+
+|... |... |... |... |...
+
+|12 |598423 |##Product\nName: Night Denim\nType: Trousers\nGroup:
+Garment Lower body\nGarment Type: Dresses L... |0.936840 |0
+
+|13 |727804 |##Product\nName: Didi HW Skinny denim\nType:
+Trousers\nGroup: Garment Lower body\nGarment Type: ... |0.934703 |0
+
+|14 |652924 |##Product\nName: &DENIM Jeggings HW\nType: Trousers\nGroup:
+Garment Lower body\nGarment Type: Tr... |0.934462 |0
+|===
+
+15 rows × 4 columns
+
+
+Merging the vector and kg personalized results together, we can see how significant the re-ranking is and how much more focused & personalized we can make search results for each customer.  This same pattern can be repeated on other knowledge bases for re-ranking and filtering to improve search relevance.  We refer to these patterns colloquially as "graph filtering".
+
++*In[3]:*+
+[source, python]
+----
+#merge and compare
+(vector_only_df
+.reset_index(names='vectorRank')[['productCode', 'vectorRank']]
+.merge(vector_kg_df.reset_index(names='graphRank'),
+       on='productCode', how='right')
+)
+----
+
+
++*Out[3]:*+
+[cols=",,,,,,",options="header",]
+|===
+| |productCode |vectorRank |graphRank |document |vectorScore |graphScore
+|0 |670698 |95 |0 |##Product\nName: Rachel HW Denim TRS\nType:
+Trousers\nGroup: Garment Lower body\nGarment Type: T... |0.922642 |22
+
+|1 |706016 |41 |1 |##Product\nName: Jade HW Skinny Denim TRS\nType:
+Trousers\nGroup: Garment Lower body\nGarment Ty... |0.926760 |11
+
+|2 |777038 |47 |2 |##Product\nName: Bono NW slim denim\nType:
+Trousers\nGroup: Garment Lower body\nGarment Type: Tr... |0.926300 |8
+
+|... |... |... |... |... |... |...
+
+|12 |598423 |1 |12 |##Product\nName: Night Denim\nType: Trousers\nGroup:
+Garment Lower body\nGarment Type: Dresses L... |0.936840 |0
+
+|13 |727804 |2 |13 |##Product\nName: Didi HW Skinny denim\nType:
+Trousers\nGroup: Garment Lower body\nGarment Type: ... |0.934703 |0
+
+|14 |652924 |3 |14 |##Product\nName: &DENIM Jeggings HW\nType:
+Trousers\nGroup: Garment Lower body\nGarment Type: Tr... |0.934462 |0
+|===
+
+15 rows × 6 columns
+
+
+
+=== Discovery Page
+The Discovery page uses the same retrieval query as the Search page, but inside a complete LLM chain, where retrieved results are provided to an LLM to generate an email given context from other parameters like season/time-of-year.  See the flow diagram below.
+
+image::ai-cust-exp-app-discovery-flow.png[align=center]
+
+
+The chain itself looks like this
+[source, python]
+----
+content_chain = (
+RunnableParallel(
+{
+'context': (lambda x: (x['customer_interests'], x['customer_id'])) | RunnableLambda(retriever),
+'customerName': (lambda x: x['customer_name']),
+'customerInterests': (lambda x: x['customer_interests']),
+'timeofYear': (lambda x: x['time_of_year']),
+})
+| prompt
+| llm
+| StrOutputParser())
+----
+
+In essence, the search context and id for the user are passed to the graph filtering retriever to get product candidates, while other details like customer name, interests, and time of year are passed to the LLM to help make decisions about choosing what content and products to include in the email.
+
+The below LLM prompt template is used.  Note that the LLM is provided some liberty over choosing items based on time-of-year and the LLM’s general "fashion knowledge".  This is a good example of using language understanding to further hone recommendations given customer context, which traditional memory and model-based recommenders can struggle with when used alone.
+
+[source, python]
+----
+from langchain_core.prompts import PromptTemplate
+
+prompt = PromptTemplate.from_template("""
+You are a personal assistant named Sally for a fashion, home, and beauty company called HRM.
+write an email to {customerName}, one of your customers, to recommend and summarize products based on:
+- the current season / time of year: {timeofYear}
+- Their recent searches & interests: {customerInterests}
+
+Please only mention the products listed in the context below. Do not come up with or add any new products to the list.
+The below candidates are recommended based on the purchase patterns of other customers in the HRM database.
+Select the best 4 to 5 product subset from the context that best match
+the time of year: {timeofYear} and the customers interests.
+Each product comes with an https `url` field.
+Make sure to provide that https url with descriptive name text in markdown for each product.
+
+# Context:
+{context}
+""")
+----
+
+=== Recommendations Page
+The Recommendations page produces an AI-generated message with fashion recommendations containing products that pair well with recently purchased/currently-viewed items and search prompts. It uses a different type of retriever based on graph embeddings, a.k.a. "graph vectors". In this application, graph vectors help find products based on common purchase patterns, i.e. what products are often bought together or bought by the same customers? This approach enhances fashion suggestions by focusing on products that _pair_ well with others and are likely to be purchased together, rather than just returning similar items based on product descriptions or search prompts. Below is a side-by-side example comparing retrieval using baseline vector search on text and GraphRAG with graph vectors.
+
+image::ai-cust-exp-recommendations-page.png[align=center]
+
+==== Graph Embedding
+The general concept of graph embedding is similar to that of text embedding, it is just that, instead of representing text in vector space for ML & search tasks, graph embedding represents graph components in vector space. This is particularly useful when you want to search for things based on similarity in graph structure. i.e. what nodes are relatively well-connected or serve similar roles in a graph? or what subgraphs look similar to one another?
+
+There are various types of graph embeddings; in this example, we use _node embeddings_. Node embeddings create vector representations of nodes that capture their position in the graph and their surrounding neighborhood structure. Below is a 2D projection showing how well-connected nodes in the graph are clustered closely together in the embedding space.
+
+image::node-embedding-explainer.png[align=center]
+
+We use Neo4j Graph Data Science (GDS) to create these node embeddings, specifically the https://neo4j.com/docs/graph-data-science/current/machine-learning/node-embeddings/fastrp/[Fast Random Projection (FastRP)^], which is a highly scalable node embedding algorithm that uses matrix algebra and statistical sampling to quickly embed large graphs. If your interested, you can see the code used to create the embeddings https://github.com/neo4j-product-examples/graphrag-examples/blob/main/load-data/hm-data.ipynb:[in this notebook under the "Create and Analyze Graph Embeddings" section^].
+
+
+==== Recommendations LLM Chain
+Below is a flow diagram of how the Recommendations page works in the app. This page is navigated to after a user clicks on a product from the Search page.
+
+image::ai-cust-exp-app-rec-flow.png[align=center]
+
+In this case, the retriever is just using the `customer_id` to get product candidates based on graph embeddings, not leveraging any other context like `customer_interests` which are based on user search prompts.
+Below is the prompt template used in the LangChain:
+
+[source, python]
+----
+from langchain_core.prompts import PromptTemplate
+
+prompt = PromptTemplate.from_template("""
+You are a personal assistant named Sally for a fashion, home, and beauty company called HRM.
+Your customer, {customerName}, is currently browsing the website.
+Please write an engaging message to them recommending and summarizing products that pair well
+with their interests and the item they are currently viewing given:
+- Item they are currently viewing: {productDescription}
+- The current season / time of year: {timeofYear}
+- Recent searches: {customerInterests}
+
+Please only mention the product candidates listed in the context below.
+Do not come up with or add any new products to the list.
+The below candidates are recommended based on the shared purchase patterns of other customers in the HRM database.
+Select the best 4 to 5 product subset from the context that best match the time of year: {timeofYear} and to pair
+with the current product being viewed and recent searches.
+For example, even if scarfs are listed here, they may not be appropriate for a summer time of year so best not to include those.
+Each product comes with an http `url` field.
+Make sure to provide that http url with descriptive name text in markdown for each product. Do not alter the url.
+
+# Context:
+{context}
+""")
+----
+
+
+In this case, the LLM is given a fair amount of creative authority to choose between and mix and match items based on its own language understanding and seasonality/time-of-year.  As we saw on the Discovery page, this is another example of using language understanding to filter recommendations given customer context which traditional memory and model-based recommenders can struggle with when used alone.
+
+=== Customer Support Page
+
+The customer support page follows a basic chatbot workflow with the addition of an extra knowledge graph retriever shown in the diagram below.  The frontend holds conversation history. When a user asks a question, the question and conversation history is sent to a `condense_question` chain to summarize into a single prompt.  That is then sent to retrieve relevant documents and knowledge graph entities which, in turn, is added to a final prompt template to generate an LLM response and send back to chat.
+
+image::ai-cust-exp-app-support-flow.png[align=center]
+
+This page uses a different part of the graph than the others. This part contains text chunks from a document as well as various knowledge graph entities and relationships extracted from those text chunks using the https://neo4j.com/labs/genai-ecosystem/llm-graph-builder/[LLM Knowledge Graph Builder^].
+
+The extracted entities act as facts or "rules" that the LLM should prioritize when responding.  This workflow is designed for scenarios where nuanced domain context and logic need to be followed by an LLM (such as policies or specific business logic). Extracting this from documents and expressing as entities and relationships in a knowledge graph more efficiently and accurately exposes this information to LLMs.
+
+Below is the prompt template used. In this case, `rules` corresponds to facts from the knowledge graph and `additionalContext` to the doc chunks.
+
+[source, python]
+----
+template = (
+"You are an assistant that helps customers with their questions. "
+"You work for for XYZBrands, a fashion, home, and beauty company. "
+"If you require follow up questions, "
+"make sure to ask the user for clarification. Make sure to include any "
+"available options that need to be clarified in the follow up questions. "
+"Embed url links as sources when made available. "
+"Answer the question based only on the below Rules and AdditionalContext. "
+"The rules should be respected as absolute fact, never provide advice that contradicts the rules. "
+"""
+# Rules
+{rules}
+
+# AdditionalContext
+{additionalContext}
+
+# Question:
+{question}
+
+# Answer:
+"""
+)
+----
+
+The chain utilizes two retrievers.
+
+
+[source, python]
+----
+# support Q&A chain
+
+prompt = ChatPromptTemplate.from_template(template)
+
+qa_chain = (
+   RunnableParallel({
+       "vectorStoreResults": condense_question |
+           vector_store.as_retriever(search_kwargs={'k': vector_top_k}),
+       "question": RunnablePassthrough()})
+   | RunnableParallel({
+       "rules": (lambda x: x["vectorStoreResults"]) |
+           RunnableLambda(retrieve_rules),
+       "additionalContext": (lambda x: x["vectorStoreResults"]) |
+           RunnableLambda(format_docs),
+       "question": lambda x: x["question"]})
+   | prompt
+   | llm
+   | StrOutputParser()
+)
+----
+
+
+`vector_store.as_retriever` conducts vector search to pull back document chunks. This is later piped to the second retriever `retrieve_rules` which grabs knowledge graph entities connected to the documents.
+
+[source, python]
+----
+def retrieve_rules(docs: List[Document]) -> str:
+   doc_chunk_ids = [doc.metadata['id'] for doc in docs]
+   res = support_graph.query("""
+   UNWIND $chunkIds AS chunkId
+   MATCH(chunk {id:chunkId})-[:HAS_ENTITY]->()-[rl:!HAS_ENTITY]-{1,5}()
+   UNWIND rl AS r
+   WITH DISTINCT r
+   MATCH (n)-[r]->(m)
+   RETURN n.id + ' - ' + type(r) +  ' -> ' + m.id AS rule ORDER BY rule
+   """, params={'chunkIds': doc_chunk_ids})
+   return '\n'.join([r['rule'] for r in res])
+----
+
+The graph pattern `MATCH(chunk {id:chunkId})-[:HAS_ENTITY]->()-[rl:!HAS_ENTITY]-{1,5}()` translated to
+
+1. match document chunk nodes: `MATCH(chunk {id:chunkId})`
+2. traverse out one hop to find entities extracted from the chunks: `-[:HAS_ENTITY]->()`
+3. search up to 5 hops out to find connections between entities: `-[rl:!HAS_ENTITY]-{1,5}()`
+4. pull all the relations from those paths: `UNWIND rl AS r WITH DISTINCT r MATCH (n)-[r]->(m)`
+5. Textualize the relations as "rules" to send to the LLM: `RETURN n.id + ' - ' + type(r) +  ' -> ' + m.id AS rule ORDER BY rule`
+
+Below is an example of rules from the Knowledge graph that can be extracted and sent to an LLM for more accurate results.  These retain to product refund and exchange policies:
+
+image::ai-cust-exp-support-sugraph.png[align=center]

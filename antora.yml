@@ -3,27 +3,34 @@ version: master
 title: Developer Guides
 nav:
 - modules/ROOT/nav.adoc
+- modules/genai-ecosystem/nav.adoc
 
 asciidoc:
   attributes:
     page-theme: developer
     img: https://dist.neo4j.com/wp-content/uploads/
+    aura_signup: https://neo4j.com/cloud/aura/?ref=developer-guides
     neo4j-version: 4.2.7
-    neo4j-ogm-version: 3.2.23
+    neo4j-ogm-version: 4.0.0
     spring-boot-version: 2.5.0
     spring-data-neo4j-version: 6.1.1
-    java-driver-version: 4.3.2
-    javascript-driver-version: 4.3.0
-    python-driver-version: 4.3.1
-    dotnet-driver-version: 4.3.0
-    go-driver-version: 4.3.1
-    testcontainers-version: 1.15.3
+    java-driver-version: 5.7.0
+    javascript-driver-version: 5.8.0
+    dotnet-driver-version: 5.8.0
+    go-driver-version: 5.8.1
+    python-driver-version: 5.8.0
+    testcontainers-version: 1.17.6
     maven-sdn: Package
     maven-artifact-info: https://search.maven.org/artifact/org.neo4j.driver/neo4j-java-driver/{java-driver-version}/jar
-
     examples: https://github.com/neo4j-examples
     cyphermanual: 'https://neo4j.com/docs/cypher-manual/current'
     drivermanual: 'https://neo4j.com/docs/driver-manual/current'
     opsmanual: 'https://neo4j.com/docs/operations-manual/current'
     github: 'https://github.com/neo4j-contrib/developer-resources/tree/gh-pages'
-    name: '{name}'
+    page-ad-overline-link: https://graphacademy.neo4j.com?ref=developer-guides
+    page-ad-overline: Free Courses
+    page-ad-title: Neo4j GraphAcademy
+    page-ad-description: Free courses for developers and data scientists from Neo4j
+    page-ad-link: https://graphacademy.neo4j.com?ref=developer-guides
+    page-ad-underline-role: button
+    page-ad-underline: Learn Neo4j
